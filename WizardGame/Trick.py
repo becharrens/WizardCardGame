@@ -4,7 +4,6 @@ from WizardGame.Card import Card, CardType, Suit, compare_cards
 
 
 class Trick:
-
     def __init__(self, trump: Suit) -> None:
         super().__init__()
         self.trump: Suit = trump
@@ -37,6 +36,8 @@ class Trick:
         self.cards[player] = card
 
     def __str__(self):
-        trick_info = f"Trick - trump: '{self.trump}', suit to follow: {self.suit_to_follow}, winning player: {self.winner_player}"
-        played_cards = ", ".join([f"{player}: {card}" for player, card in self.cards.items()])
+        trick_info = f"Trick - trump: '{self.trump}', suit to follow: {self.suit_to_follow}, winning player: {self.winner_player}, winning card: {self.winner_card}"
+        played_cards = ", ".join(
+            [f"{player}: {card}" for player, card in self.cards.items()]
+        )
         return "\n".join([trick_info, played_cards]) + "\n\n"
