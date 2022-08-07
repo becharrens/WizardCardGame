@@ -1,6 +1,8 @@
 import random
 from enum import IntEnum
+from typing import Optional
 
+from WizardGame.Card import Card
 from WizardGame.Constants import NUM_CARDS
 
 
@@ -109,6 +111,31 @@ class Card:
 
         return suit * (len(CardType.numbers)) + card_type
 
+    @staticmethod
+    def from_string(string: str) -> Card:
+        card_type_str, suit_str = string[:-1], string[-1:]
+        card_type: Optional[CardType] = None
+        match string:
+            case "Z":
+                return Card(CardType.WIZARD, Suit.NONE)
+            case "N":
+                return Card(CardType.JESTER, Suit.NONE)
+            case _:
+                card_type_str, suit_str = string[:-1], string[-1:]
+                card_type: CardType = CardType(int(card_type_str))
+                match suit_str:
+                    case "Y":
+                        suit: Suit = Suit.YELLOW
+                    case "B":
+                        suit: Suit = Suit.BLUE
+                    case "G":
+                        suit: Suit = Suit.GREEN
+                    case "R":
+                        suit: Suit = Suit.RED
+                    case _:
+                        raise Exception("Unreachable!")
+                return Card(card_type, suit)
+
     def __str__(self) -> str:
         return f"{self.card_type}{self.suit}"
 
@@ -120,13 +147,22 @@ class Card:
         return f"{self.card_type}{self.suit}"
 
 
-def compare_cards(card1: Card, card2: Card, trump: Suit) -> int:
+def compare_cards(card1: Optional[Card], card2: Optional[Card], trump: Suit) -> int:
     """
     :param card1: first card to compare
     :param card2: second card to compare
     :param trump: trump suit for the round
     :return: 1 if card1 wins against card2, -1 if card1 loses card2 when card1 is played first
     """
+    if card1 == card2:
+        return 0
+
+    if card1 is None:
+        return -1
+
+    if card2 is None:
+        return 1
+
     match (card1.card_type, card2.card_type):
         case (CardType.WIZARD, _):
             return 1
@@ -166,3 +202,16 @@ def build_shuffled_deck() -> list[Card]:
     random.shuffle(deck)
 
     return deck
+
+
+def playable_cards(hand: list[Card], suit_to_follow: Optional[Suit]) -> list[Card]:
+    cards: set[Card] = set(
+        card
+        for card in hand
+        if card.suit == suit_to_follow and suit_to_follow != Suit.NONE
+    )
+
+    if len(cards) == 0:
+        return list(hand)
+    else:
+        return list(cards.union({card for card in hand if card.suit == Suit.NONE}))

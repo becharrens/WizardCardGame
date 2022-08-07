@@ -1,7 +1,8 @@
-from typing import Iterable, Optional
+import random
+from typing import Iterable, Optional, FrozenSet
 
 from WizardGame.Board import Board
-from WizardGame.Card import Suit, Card, CardType, compare_cards
+from WizardGame.Card import Suit, Card, CardType, compare_cards, build_deck
 from WizardGame.Constants import CARDS_PER_SUIT, NUM_CARDS, NUM_JESTERS
 from WizardGame.Player import Player
 from WizardGame.PlayerBid import PlayerBid
@@ -44,6 +45,8 @@ class ProbabilisticAIPlayer(Player):
 
     def select_card(self, trick: Trick, cards_to_play: set[Card]) -> Card:
         self.player_suit_exhausted = self.any_suit_exhausted()
+        if self.player_suit_exhausted:
+            self.update_player_suits_left(trick)
 
         bid: PlayerBid = self.board.player_bids[self.name]
         tricks_left_to_win: int = min(
@@ -64,27 +67,54 @@ class ProbabilisticAIPlayer(Player):
             )
             for card in cards_to_play
         ]
+
+        if trick.winner_card is None:
+            card_chances_in_new_trick: list[(Card, float)] = card_chances
+        else:
+            card_chances_in_new_trick: list[(Card, float)] = [
+                (
+                    card,
+                    self.probability_of_winning_trick(
+                        card,
+                        Trick(trick.trump),
+                        all_cards_seen,
+                    ),
+                )
+                for card in cards_to_play
+            ]
+
         print(f"{self.name}: card chances of winning: {card_chances}")
+
+        if tricks_left_to_win == 0:
+            card_chances_in_new_trick: list[(Card, float)] = [
+                (card, 1 - p) for card, p in card_chances_in_new_trick
+            ]
+            card_chances: list[(Card, float)] = [
+                (card, 1 - p) for card, p in card_chances
+            ]
 
         # TODO: consider more factors here, such as, if you are always going to lose, be smart when choosing
         #       which card to discard
-        if tricks_left_to_win == 0:
-            min_chance: float = 1.1
-            min_card: Optional[Card] = None
-            for card, chance in card_chances:
-                if chance < min_chance:
-                    min_chance = chance
-                    min_card = card
-            return min_card
+        max_chance: float = -1.0
+        max_card: Optional[Card] = None
+        for card, chance in card_chances:
+            if chance > max_chance:
+                max_chance = chance
+                max_card = card
 
-        else:
+        if max_chance == 0.0:
+            card_chances_in_new_trick: list[(Card, float)] = [
+                (card, 1 - p) for card, p in card_chances_in_new_trick
+            ]
+            print(f"{self.name} - Choosing card based on absolute card values")
             max_chance: float = -1.0
             max_card: Optional[Card] = None
-            for card, chance in card_chances:
+            for card, chance in card_chances_in_new_trick:
                 if chance > max_chance:
                     max_chance = chance
                     max_card = card
-            return max_card
+
+        return max_card
 
     def select_bid(self, bids: dict[str, PlayerBid]) -> int:
         num_bids: int = 0
@@ -92,6 +122,16 @@ class ProbabilisticAIPlayer(Player):
         all_cards_seen: set[int] = (
             set(hash(card) for card in self.hand) | self.board.played_cards
         )
+        # TODO:
+        cards_left_per_suit: dict[Suit, int] = dict()
+        for suit in Suit.all_suits:
+            s: Suit = Suit(suit)
+            for card_type in CardType.numbers:
+                if Card.index(CardType(card_type), s, 0, 0) not in all_cards_seen:
+                    cards_left_per_suit[s] = cards_left_per_suit.setdefault(s, 0) + 1
+
+        cards_remaining: float = float(NUM_CARDS - len(all_cards_seen))
+
         for card in self.hand:
             probability: float = self.uniform_probability_of_card_winning(
                 card, None, self.board.trump, all_cards_seen, 0
@@ -233,17 +273,15 @@ class ProbabilisticAIPlayer(Player):
     def probability_of_winning_trick(
         self, card: Card, trick: Trick, cards_seen: set[int]
     ) -> float:
-        if self.player_suit_exhausted:
-            return self.probability_of_card_winning_with_player_info(
-                card,
-                trick,
-                cards_seen,
-                len(trick.cards),
-            )
-
-        return self.uniform_probability_of_card_winning(
-            card, trick.winner_card, trick.trump, cards_seen, len(trick.cards)
-        )
+        # if self.player_suit_exhausted:
+        #     return self.probability_of_card_winning_with_player_info(
+        #         card,
+        #         trick,
+        #         cards_seen,
+        #         len(trick.cards),
+        #     )
+        #
+        return self.estimate_probability_of_winning_with_card(card, trick, cards_seen)
 
     # TODO: Remove duplication
     def probability_of_card_winning_with_player_info(
@@ -367,3 +405,197 @@ class ProbabilisticAIPlayer(Player):
 
         players_left.add(player)
         return probability * player_probability
+
+    def estimate_probability_of_winning_with_card(
+        self, card: Card, trick: Trick, cards_seen: set[int]
+    ) -> float:
+        players_left: set[str] = {
+            player
+            for player in self.board.player_scores
+            if player not in trick.cards and player != self.name
+        }
+        if (
+            trick.winner_card is not None
+            and compare_cards(trick.winner_card, card, trick.trump) > 0
+        ):
+            return 0.0
+
+        if card.card_type == CardType.WIZARD:
+            return 1.0
+
+        player_probabilities: dict[FrozenSet, float] = dict()
+        probability = 1.0
+        for player in players_left:
+            suits_left = frozenset(self.player_suits_left[player])
+            if suits_left in player_probabilities:
+                player_losing_probability: float = player_probabilities[suits_left]
+            else:
+                player_losing_probability: float = (
+                    self.simulate_player_losing_probability(
+                        suits_left,
+                        card,
+                        len(self.hand),
+                        trick,
+                        cards_seen,
+                        iterations=1000,
+                    )
+                )
+            probability *= player_losing_probability
+        return probability
+
+    def simulate_player_losing_probability(
+        self,
+        suits_left: frozenset[Suit],
+        card_to_beat: Card,
+        num_cards: int,
+        trick: Trick,
+        cards_seen: set[int],
+        iterations: int = 1000,
+    ) -> float:
+        deck: list[Card] = [
+            card
+            for card in build_deck()
+            if hash(card) not in cards_seen and card.suit in suits_left
+        ]
+        for i in range(NUM_JESTERS):
+            wizard: Card = Card(CardType.WIZARD, Suit.NONE, wizard_index=i)
+            if hash(wizard) not in cards_seen:
+                deck.append(wizard)
+            jester: Card = Card(CardType.JESTER, Suit.NONE, jester_index=i)
+            if hash(jester) not in cards_seen:
+                deck.append(jester)
+
+        if len(deck) < num_cards:
+            return 0.0
+
+        num_hands: int = 0
+        probability_of_winning: float = 0.0
+        can_play_anything = (
+            trick.is_wizard_played
+            or (trick.suit_to_follow == Suit.NONE or trick.suit_to_follow is None)
+            and card_to_beat.suit == Suit.NONE
+        )
+        if can_play_anything:
+            suits_to_play: set[Suit] = {Suit(suit) for suit in Suit.values}
+        else:
+            suits_to_play: set[Suit] = (
+                {card_to_beat.suit, Suit.NONE}
+                if trick.suit_to_follow == Suit.NONE or trick.suit_to_follow is None
+                else {trick.suit_to_follow, Suit.NONE}
+            )
+        for i in range(iterations):
+            random.shuffle(deck)
+            for j in range(len(deck) // num_cards):
+                num_hands += 1
+                special_playable_cards: int = 0
+                playable_cards: int = 0
+                losing_cards: int = 0
+                losing_cards_in_hand: int = 0
+                for k in range(num_cards):
+                    card: Card = deck[j * num_cards + k]
+                    if card.suit in suits_to_play:
+                        playable_cards += 1
+
+                    if card.suit == Suit.NONE:
+                        special_playable_cards += 1
+
+                    if compare_cards(card_to_beat, card, trick.trump) > 0:
+                        losing_cards_in_hand += 1
+                        if card.suit in suits_to_play:
+                            losing_cards += 1
+
+                if playable_cards == special_playable_cards:
+                    playable_cards = num_cards
+                    losing_cards = losing_cards_in_hand
+
+                # Uniform probability
+                probability_of_winning += float(losing_cards) / float(playable_cards)
+
+        return float(probability_of_winning) / float(num_hands)
+
+    # def simulate_probability_of_remaining_players_losing(
+    #     self,
+    #     players_left: set[str],
+    #     suits_left: frozenset[Suit],
+    #     card_to_beat: Card,
+    #     num_cards: int,
+    #     trick: Trick,
+    #     cards_seen: set[int],
+    #     iterations: int = 1000,
+    # ) -> float:
+    #     deck: set[Card] = {
+    #         card
+    #         for card in build_deck()
+    #         if hash(card) not in cards_seen
+    #     }
+    #     for i in range(NUM_JESTERS):
+    #         wizard: Card = Card(CardType.WIZARD, Suit.NONE, wizard_index=i)
+    #         if hash(wizard) not in cards_seen:
+    #             deck.add(wizard)
+    #         jester: Card = Card(CardType.JESTER, Suit.NONE, jester_index=i)
+    #         if hash(jester) not in cards_seen:
+    #             deck.add(jester)
+    #
+    #     if len(deck) < num_cards:
+    #         print("WARNING - there are too few cards left")
+    #         return 0.0
+    #
+    #     probability_of_winning: float = 0.0
+    #     can_play_anything = (
+    #         trick.is_wizard_played
+    #         or (trick.suit_to_follow == Suit.NONE or trick.suit_to_follow is None)
+    #         and card_to_beat.suit == Suit.NONE
+    #     )
+    #     if can_play_anything:
+    #         suits_to_play: set[Suit] = {Suit(suit) for suit in Suit.values}
+    #     else:
+    #         suits_to_play: set[Suit] = (
+    #             {card_to_beat.suit, Suit.NONE}
+    #             if trick.suit_to_follow == Suit.NONE or trick.suit_to_follow is None
+    #             else {trick.suit_to_follow, Suit.NONE}
+    #         )
+    #
+    #     for i in range(iterations):
+    #         random.shuffle(deck)
+    #         for (j, player in players_left:
+    #             special_playable_cards: int = 0
+    #             playable_cards: int = 0
+    #             losing_cards: int = 0
+    #             losing_cards_in_hand: int = 0
+    #             for k in range(num_cards):
+    #                 card: Card = deck[j * num_cards + k]
+    #                 if card.suit in suits_to_play:
+    #                     playable_cards += 1
+    #
+    #                 if card.suit == Suit.NONE:
+    #                     special_playable_cards += 1
+    #
+    #                 if compare_cards(card_to_beat, card, trick.trump) > 0:
+    #                     losing_cards_in_hand += 1
+    #                     if card.suit in suits_to_play:
+    #                         losing_cards += 1
+    #
+    #             if playable_cards == special_playable_cards:
+    #                 playable_cards = num_cards
+    #                 losing_cards = losing_cards_in_hand
+    #
+    #             # Uniform probability
+    #             probability_of_winning += float(losing_cards) / float(playable_cards)
+    #
+    #     return float(probability_of_winning) / float(num_hands)
+
+    def generate_hand(
+        self, hand_size: int, suits_left: frozenset[Suit], deck: set[Card]
+    ):
+        if len(deck) == hand_size:
+            return set(deck)
+
+        available_cards = tuple(card for card in deck if card.suit in suits_left)
+        if len(available_cards) < hand_size:
+            raise Exception(
+                f"There are not enough cards to build a hand -  deck= {deck}, available cards={available_cards}, "
+                f"suits_left={suits_left}"
+            )
+        hand: set[Card] = set(random.sample(available_cards, hand_size))
+        deck -= hand
+        return hand

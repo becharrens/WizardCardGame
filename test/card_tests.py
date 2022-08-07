@@ -4,7 +4,7 @@ from WizardGame.Card import build_deck, Card, CardType, Suit
 from WizardGame.ProbailisticAIPlayer import ProbabilisticAIPlayer
 
 
-class MyTestCase(unittest.TestCase):
+class CardTests(unittest.TestCase):
     def test_build_deck_contains_all_cards(self):
         expected_deck = [
             Card(CardType.ONE, Suit.BLUE, wizard_index=0, jester_index=0),
@@ -78,17 +78,32 @@ class MyTestCase(unittest.TestCase):
         special_card_hashes = [57, 53, 58, 54, 59, 55, 60, 56]
         number_card_hashes = list(range(1, 53))
         expected_hashes = number_card_hashes + special_card_hashes
-        self.assertEqual(list(expected_hashes), hashes, "hashes of cards do not match expected values")
+        self.assertEqual(
+            list(expected_hashes),
+            hashes,
+            "hashes of cards do not match expected values",
+        )
 
     def test_probability(self):
         # Z,1R,5Y  12Y
-        cards_seen = {Card(CardType.FIVE, Suit.YELLOW), Card(CardType.TWELVE, Suit.YELLOW),
-                      Card(CardType.ONE, Suit.RED), Card(CardType.WIZARD, Suit.NONE)}
+        cards_seen = {
+            Card(CardType.FIVE, Suit.YELLOW),
+            Card(CardType.TWELVE, Suit.YELLOW),
+            Card(CardType.ONE, Suit.RED),
+            Card(CardType.WIZARD, Suit.NONE),
+        }
         cards_seen_hashes = {hash(card) for card in cards_seen}
-        player = ProbabilisticAIPlayer('CPU4', 4)
-        print(player.uniform_probability_of_card_winning(Card(CardType.FIVE, Suit.YELLOW), Suit.YELLOW, Suit.YELLOW,
-                                                         cards_seen_hashes, 0, False))
+        player = ProbabilisticAIPlayer("CPU4", 4)
+        print(
+            player.uniform_probability_of_card_winning(
+                Card(CardType.FIVE, Suit.YELLOW),
+                Suit.YELLOW,
+                cards_seen_hashes,
+                0,
+                False,
+            )
+        )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
