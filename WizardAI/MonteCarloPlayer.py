@@ -44,11 +44,16 @@ class MonteCarloPlayer(Player):
         self.wins_estimate: int = -1
 
     def select_card(self, trick: Trick, cards_to_play: list[Card]) -> Card:
+        trump_suit: Suit = (
+            self.board.trump_card.suit
+            if self.board.trump_card is not None
+            else Suit.NONE
+        )
         simulator: MonteCarloSimulator = MonteCarloSimulator(
             self.name,
             self.hand,
             self.board.player_tricks_won,
-            self.board.trump_card.suit,
+            trump_suit,
             self.board.trump_card,
             trick.winner_card,
             trick.winner_player,
@@ -64,11 +69,16 @@ class MonteCarloPlayer(Player):
         return simulator.choose_card(cards_to_play)
 
     def choose_trump(self) -> Suit:
+        trump_suit: Suit = (
+            self.board.trump_card.suit
+            if self.board.trump_card is not None
+            else Suit.NONE
+        )
         simulator: MonteCarloSimulator = MonteCarloSimulator(
             self.name,
             self.hand,
             self.board.player_tricks_won,
-            self.board.trump_card.suit,
+            trump_suit,
             self.board.trump_card,
             None,
             None,
@@ -84,11 +94,16 @@ class MonteCarloPlayer(Player):
         return simulator.choose_trump()
 
     def select_bid(self, bids: dict[str, int]) -> int:
+        trump_suit: Suit = (
+            self.board.trump_card.suit
+            if self.board.trump_card is not None
+            else Suit.NONE
+        )
         simulator: MonteCarloSimulator = MonteCarloSimulator(
             self.name,
             self.hand,
             self.board.player_tricks_won,
-            self.board.trump_card.suit,
+            trump_suit,
             self.board.trump_card,
             None,
             None,

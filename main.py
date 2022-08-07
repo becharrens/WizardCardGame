@@ -8,9 +8,9 @@ def main():
     game: Game = Game(
         [
             RandomAIPlayer("P1", num_players),
-            MonteCarloPlayer("CPU2", num_players, 2, 2),
-            MonteCarloPlayer("CPU3", num_players, 2, 2),
-            MonteCarloPlayer("CPU4", num_players, 2, 2),
+            MonteCarloPlayer("CPU2", num_players, 1, 1000),
+            MonteCarloPlayer("CPU3", num_players, 1, 1000),
+            MonteCarloPlayer("CPU4", num_players, 1, 1000),
         ]
     )
     game.play_game()
