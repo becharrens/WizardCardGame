@@ -36,7 +36,11 @@ class Trick:
         self.cards[player] = card
 
     def __str__(self):
-        trick_info = f"Trick - trump: '{self.trump}', suit to follow: {self.suit_to_follow}, winning player: {self.winner_player}, winning card: {self.winner_card}"
+        trick_info = (
+            f"Trick - trump: '{self.trump}', suit to follow: {self.suit_to_follow}, "
+            f"winning player: {self.winner_player}, winning card: {self.winner_card}, "
+            f"played cards: {self.cards}"
+        )
         played_cards = ", ".join(
             [f"{player}: {card}" for player, card in self.cards.items()]
         )

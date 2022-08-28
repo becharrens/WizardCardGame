@@ -59,6 +59,8 @@ class Game:
             else:
                 trump = trump_card.suit
 
+        print(f"Trump card for this round is {trump_card}, trump suit = {trump}")
+
         bids: dict[str, int] = dict()
         board: Board = Board(
             trump_card,

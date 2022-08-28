@@ -310,9 +310,6 @@ class MonteCarloSimulator:
 
     def choose_card(self, cards_to_play: list[Card]) -> Card:
         # Assume it is simulated player's turn
-        hands: dict[str, list[Card]] = self.generate_hands_with_constraints(
-            max_tries=10
-        )
         hand_sizes: dict[str, int] = self.get_hand_sizes()
         # Count card which is about to be played
         cards_played: int = self.get_cards_played(hand_sizes) + 1
@@ -323,34 +320,38 @@ class MonteCarloSimulator:
         chosen_card: Card = cards_to_play[0]
         for card in cards_to_play:
             new_hand: list[Card] = [c for c in self.hand if c != card]
-            hands[self.name] = new_hand
             winning_freq: dict[int, int] = dict()
-            if compare_cards(self.current_winning_card, card, self.trump_suit) < 0:
-                next_suit_to_follow: Optional[Suit] = get_new_suit_to_follow(
-                    card, self.current_winning_card, self.suit_to_follow
+            for i in range(self.num_iterations):
+                hands: dict[str, list[Card]] = self.generate_hands_with_constraints(
+                    max_tries=10
                 )
+                hands[self.name] = new_hand
+                if compare_cards(self.current_winning_card, card, self.trump_suit) < 0:
+                    next_suit_to_follow: Optional[Suit] = get_new_suit_to_follow(
+                        card, self.current_winning_card, self.suit_to_follow
+                    )
 
-                self.simulate_number_of_wins_with_starting_hands(
-                    next_player,
-                    self.tricks_won,
-                    hands,
-                    self.name,
-                    card,
-                    next_suit_to_follow,
-                    winning_freq,
-                    cards_played,
-                )
-            else:
-                self.simulate_number_of_wins_with_starting_hands(
-                    next_player,
-                    self.tricks_won,
-                    hands,
-                    self.current_winner,
-                    self.current_winning_card,
-                    self.suit_to_follow,
-                    winning_freq,
-                    cards_played,
-                )
+                    self.simulate_number_of_wins_with_starting_hands(
+                        next_player,
+                        self.tricks_won,
+                        hands,
+                        self.name,
+                        card,
+                        next_suit_to_follow,
+                        winning_freq,
+                        cards_played,
+                    )
+                else:
+                    self.simulate_number_of_wins_with_starting_hands(
+                        next_player,
+                        self.tricks_won,
+                        hands,
+                        self.current_winner,
+                        self.current_winning_card,
+                        self.suit_to_follow,
+                        winning_freq,
+                        cards_played,
+                    )
 
             assert (
                 self.wins_estimate is not None

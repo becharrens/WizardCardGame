@@ -2,9 +2,6 @@ import random
 from enum import IntEnum
 from typing import Optional
 
-from WizardGame.Card import Card
-from WizardGame.Constants import NUM_CARDS
-
 
 class CardType(IntEnum):
     JESTER = 0
@@ -111,31 +108,6 @@ class Card:
 
         return suit * (len(CardType.numbers)) + card_type
 
-    @staticmethod
-    def from_string(string: str) -> Card:
-        card_type_str, suit_str = string[:-1], string[-1:]
-        card_type: Optional[CardType] = None
-        match string:
-            case "Z":
-                return Card(CardType.WIZARD, Suit.NONE)
-            case "N":
-                return Card(CardType.JESTER, Suit.NONE)
-            case _:
-                card_type_str, suit_str = string[:-1], string[-1:]
-                card_type: CardType = CardType(int(card_type_str))
-                match suit_str:
-                    case "Y":
-                        suit: Suit = Suit.YELLOW
-                    case "B":
-                        suit: Suit = Suit.BLUE
-                    case "G":
-                        suit: Suit = Suit.GREEN
-                    case "R":
-                        suit: Suit = Suit.RED
-                    case _:
-                        raise Exception("Unreachable!")
-                return Card(card_type, suit)
-
     def __str__(self) -> str:
         return f"{self.card_type}{self.suit}"
 
@@ -145,6 +117,48 @@ class Card:
         if self.card_type == CardType.JESTER:
             return f"{self.card_type}{self.suit} i={self.jester_index}"
         return f"{self.card_type}{self.suit}"
+
+
+def card_from_string(card_str: str) -> Card:
+    card_str = card_str.upper()
+    match card_str:
+        case "Z":
+            return Card(CardType.WIZARD, Suit.NONE)
+        case "N":
+            return Card(CardType.JESTER, Suit.NONE)
+        case _:
+            try:
+                card_type_str, suit_str = card_str[:-1], card_str[-1:]
+                card_type: CardType = CardType(int(card_type_str))
+            except (TypeError, IndexError, ValueError):
+                raise InvalidCardException(f"Card {card_str} is not a valid card!")
+
+            match suit_str:
+                case "Y":
+                    suit: Suit = Suit.YELLOW
+                case "B":
+                    suit: Suit = Suit.BLUE
+                case "G":
+                    suit: Suit = Suit.GREEN
+                case "R":
+                    suit: Suit = Suit.RED
+                case _:
+                    raise InvalidCardException(f"Card {card_str} is not a valid card!")
+            return Card(card_type, suit)
+
+
+def suit_from_string(suit_str: str) -> Suit:
+    match suit_str.upper():
+        case "Y":
+            return Suit.YELLOW
+        case "B":
+            return Suit.BLUE
+        case "G":
+            return Suit.GREEN
+        case "R":
+            return Suit.RED
+        case _:
+            raise InvalidSuitException(f"{suit_str} is not a valid suit!")
 
 
 def compare_cards(card1: Optional[Card], card2: Optional[Card], trump: Suit) -> int:
@@ -215,3 +229,11 @@ def playable_cards(hand: list[Card], suit_to_follow: Optional[Suit]) -> list[Car
         return list(hand)
     else:
         return list(cards.union({card for card in hand if card.suit == Suit.NONE}))
+
+
+class InvalidSuitException(Exception):
+    pass
+
+
+class InvalidCardException(Exception):
+    pass
