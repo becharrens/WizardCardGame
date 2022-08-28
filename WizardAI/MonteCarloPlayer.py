@@ -1,3 +1,5 @@
+import math
+import random
 from typing import Optional
 
 from WizardAI.Card import (
@@ -11,6 +13,8 @@ from WizardAI.Card import (
 )
 from WizardAI.Player import Player
 from WizardAI.Trick import Trick
+
+MAX_BRANCH_FACTOR = 3
 
 
 def get_new_suit_to_follow(
@@ -58,7 +62,7 @@ class MonteCarloPlayer(Player):
             trick.winner_card,
             trick.winner_player,
             trick.suit_to_follow,
-            self.board.turn,
+            self.board.starting_player,
             dict(),
             dict(),
             self.board.next_player_lookup,
@@ -210,7 +214,16 @@ class MonteCarloSimulator:
         player_hand: list[Card] = player_hands[current_player]
         cards: list[Card] = playable_cards(player_hand, suit_to_follow)
         next_player: str = self.next_player_lookup[current_player]
-        for i in range(min(self.branch_factor, len(cards))):
+        prob = max(
+            1, len(player_hands) * len(self.hand) // 5 * max(len(self.hand) // 4, 1)
+        )
+
+        if random.randint(1, prob) == 1:
+            branch_factor: int = min(MAX_BRANCH_FACTOR, len(cards))
+        else:
+            branch_factor: int = 1
+
+        for i in range(branch_factor):
             card: Card = cards[i]
             new_hand: list[Card] = [c for c in player_hand if c != card]
             # print(

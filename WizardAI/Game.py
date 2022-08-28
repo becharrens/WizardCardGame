@@ -29,6 +29,8 @@ class Game:
         deck: list[Card] = build_shuffled_deck()
         first_player = self.next_player_lookup[self.dealer]
 
+        print(f"Dealer = {self.dealer}, First player = {first_player}")
+
         player_hands: dict[str, list[Card]] = dict()
 
         # deal hands
@@ -111,10 +113,13 @@ class Game:
         self.tricks.append(trick)
 
         # score
-        board.update_scores()
         print(f"Bids: {board.player_bids}")
         print(f"Tricks won: {board.player_tricks_won}")
-        print(self.player_scores)
+        print(f"Current scores: {board.player_scores}")
+        board.update_scores()
+        print(f"Updated scores: {self.player_scores}")
+
+        self.dealer = first_player
 
     def play_game(self) -> None:
         for i in range(CARDS_IN_DECK // len(self.players)):
